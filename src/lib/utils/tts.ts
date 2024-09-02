@@ -11,7 +11,7 @@ interface TTSResponse {
 }
 
 export async function requestTTS(text: string, voice_name: string): Promise<TTSResponse> {
-  const response = await fetch(`http://threadripper:8001/tts`, {
+  const response = await fetch(`${base}/api/tts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
