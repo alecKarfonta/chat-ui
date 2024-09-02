@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { onMount } from "svelte";
+  	import { requestTTS, splitIntoSentences } from "$lib/utils/tts";
+  
 	import type { Message, MessageFile } from "$lib/types/Message";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
 
@@ -55,6 +58,99 @@
 	let isSharedRecently = false;
 	$: $page.params.id && (isSharedRecently = false);
 
+
+	let audioQueue: AudioBuffer[] = [];
+	let audioContext: AudioContext;
+	let isPlaying = false;
+	let isTTSEnabled = true; // New variable to toggle TTS
+
+
+	function log(message: string, data?: any) {
+		const timestamp = new Date().toISOString();
+		console.log(`[${timestamp}] ChatWindow: ${message}`, data ? data : '');
+	}
+
+
+
+	onMount(() => {
+		log("Component mounted");
+		audioContext = new (window.AudioContext || window.webkitAudioContext)();
+		log("AudioContext created", { state: audioContext.state });
+	});
+
+	onDestroy(() => {
+		log("Component being destroyed");
+		if (audioContext) {
+		audioContext.close();
+		log("AudioContext closed");
+		}
+	});
+
+	async function processMessageForTTS(message: string) {
+		log("Processing message for TTS", { message });
+		const sentences = splitIntoSentences(message);
+		log("Split into sentences", { count: sentences.length });
+
+		for (const sentence of sentences) {
+		try {
+			log("Requesting TTS for sentence", { sentence });
+			const ttsResponse = await requestTTS(sentence, "default_voice");
+			log("TTS response received", { samplerate: ttsResponse.samplerate, wavLength: ttsResponse.wav.length });
+
+			const audioBuffer = await audioContext.decodeAudioData(new Float32Array(ttsResponse.wav).buffer);
+			log("Audio decoded", { duration: audioBuffer.duration });
+
+			audioQueue.push(audioBuffer);
+			audioQueue = audioQueue; // Trigger Svelte reactivity
+			log("Audio added to queue", { queueLength: audioQueue.length });
+
+			if (!isPlaying) {
+			log("Starting playback");
+			playNextInQueue();
+			}
+		} catch (error) {
+			console.error("Error processing TTS:", error);
+			log("Error processing TTS", { error });
+		}
+		}
+	}
+
+	function playNextInQueue() {
+		if (audioQueue.length === 0) {
+		isPlaying = false;
+		log("Audio queue empty, playback stopped");
+		return;
+		}
+
+		isPlaying = true;
+		const source = audioContext.createBufferSource();
+		const buffer = audioQueue.shift()!;
+		source.buffer = buffer;
+		audioQueue = audioQueue; // Trigger Svelte reactivity
+		log("Playing next audio in queue", { duration: buffer.duration, remainingInQueue: audioQueue.length });
+
+		source.connect(audioContext.destination);
+		source.onended = () => {
+		log("Audio playback ended");
+		playNextInQueue();
+		};
+		source.start();
+		log("Audio playback started");
+	}
+
+	const handleSubmit = async () => {
+		if (loading) {
+		log("Submit blocked due to loading state");
+		return;
+		}
+		log("Handling submit", { message });
+		dispatch("message", message);
+		await processMessageForTTS(message);
+		message = "";
+		log("Submit handled, message cleared");
+	};
+
+
 	const dispatch = createEventDispatcher<{
 		message: string;
 		share: void;
@@ -63,11 +159,6 @@
 		continue: { id: Message["id"] };
 	}>();
 
-	const handleSubmit = () => {
-		if (loading) return;
-		dispatch("message", message);
-		message = "";
-	};
 
 	let lastTarget: EventTarget | null = null;
 
@@ -182,12 +273,6 @@
 			isSharedRecently = false;
 		}, 2000);
 	}
-
-	onDestroy(() => {
-		if (timeout) {
-			clearTimeout(timeout);
-		}
-	});
 
 	let chatContainer: HTMLElement;
 
@@ -495,6 +580,13 @@
 						{/if}
 					</button>
 				{/if}
+				<button on:click={() => {
+					audioQueue = [];
+					isPlaying = false;
+					if (audioContext.state === "running") {
+						audioContext.suspend();
+					}
+					}}>Stop TTS</button>
 			</div>
 		</div>
 	</div>

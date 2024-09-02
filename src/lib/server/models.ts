@@ -95,6 +95,13 @@ async function getChatPromptRender(
 	}
 
 	const renderTemplate = ({ messages, preprompt, tools, toolResults }: ChatTemplateInput) => {
+
+
+		console.log('renderTemplate()');
+
+		console.log('renderTemplate(): messages', messages);
+
+
 		let formattedMessages: { role: string; content: string }[] = messages.map((message) => ({
 			content: message.content,
 			role: message.from,

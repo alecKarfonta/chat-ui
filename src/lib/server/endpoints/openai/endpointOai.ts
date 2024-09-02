@@ -49,8 +49,8 @@ export const endpointOAIParametersSchema = z.object({
 export async function endpointOai(
     input: z.input<typeof endpointOAIParametersSchema>
 ): Promise<Endpoint> {
-    console.log('Starting endpointOai function');
-    console.log('Input:', JSON.stringify(input, null, 2));
+    console.log('endpointOai(): Starting endpointOai function');
+    console.log('endpointOai(): Input:', JSON.stringify(input, null, 2));
 
     try {
         const {
@@ -76,28 +76,28 @@ export async function endpointOai(
             throw new Error("Failed to import OpenAI", { cause: e });
         }
 
-        console.log('Initializing OpenAI client');
+        console.log('endpointOai(): Initializing OpenAI client');
         const openai = new OpenAI({
             apiKey: apiKey ?? "sk-",
             baseURL,
             defaultHeaders,
             defaultQuery,
         });
-        console.log('OpenAI client initialized');
+        console.log('endpointOai(): OpenAI client initialized');
 
-        console.log('Initializing image processor');
+        console.log('endpointOai(): Initializing image processor');
         const imageProcessor = makeImageProcessor(multimodal.image);
-        console.log('Image processor initialized');
+        console.log('endpointOai(): Image processor initialized');
 
         if (completion === "completions") {
-            console.log('Error: completions endpoint is not supported');
+            console.log('endpointOai(): Error: completions endpoint is not supported');
         } else if (completion === "chat_completions") {
-            console.log('Using chat completions endpoint');
+            console.log('endpointOai(): Using chat completions endpoint');
             return async ({ messages, preprompt, generateSettings }) => {
-                console.log('Preparing messages');
+                console.log('endpointOai(): Preparing messages');
                 let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
                     await prepareMessages(messages, imageProcessor);
-                console.log('Messages prepared:', messagesOpenAI);
+                console.log('endpointOai(): Messages prepared:', messagesOpenAI);
 
                 if (messagesOpenAI?.[0]?.role !== "system") {
                     console.log('Adding system message');
@@ -110,7 +110,7 @@ export async function endpointOai(
                 }
 
                 const parameters = { ...model.parameters, ...generateSettings };
-                console.log('Parameters:', parameters);
+                console.log('endpointOai(): Parameters:', parameters);
 
                 const body: CompletionCreateParamsStreaming | CompletionCreateParamsNonStreaming = {
                     model: model.id ?? model.name,
@@ -125,14 +125,15 @@ export async function endpointOai(
                 console.log('Request body:', body);
 
                 try {
-                    console.log('Sending request to OpenAI chat completions API');
+                    console.log('endpointOai(): Sending request to OpenAI chat completions API');
                     if (stream) {
                         const openChatAICompletion = await openai.chat.completions.create(body as ChatCompletionCreateParamsStreaming);
-                        console.log('Received streaming response from OpenAI');
+                        console.log('endpointOai(): Received streaming response from OpenAI');
                         return openAIChatToTextGenerationStream(openChatAICompletion);
                     } else {
                         const openChatAICompletion = await openai.chat.completions.create(body as ChatCompletionCreateParamsNonStreaming);
-                        console.log('Received non-streaming response from OpenAI');
+                        console.log('endpointOai(): Received non-streaming response from OpenAI');
+                        console.log('endpointOai(): openChatAICompletion:', openChatAICompletion);
                         return async function* (): AsyncGenerator<TextGenerationStreamOutput> {
                             yield {
                                 token: {
@@ -147,16 +148,16 @@ export async function endpointOai(
                         }();
                     }
                 } catch (error) {
-                    console.error('Error in OpenAI chat completions API call:', error);
+                    console.error('endpointOai(): Error in OpenAI chat completions API call:', error);
                     throw error;
                 }
             };
         } else {
-            console.error('Invalid completion type:', completion);
+            console.error('endpointOai(): Invalid completion type:', completion);
             throw new Error("Invalid completion type");
         }
     } catch (error) {
-        console.error('Error in endpointOai function:', error);
+        console.error('endpointOai(): Error in endpointOai function:', error);
         throw error;
     }
 }
