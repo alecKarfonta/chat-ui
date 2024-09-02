@@ -86,6 +86,13 @@
 		}
 	});
 
+	$: {
+		const lastMessage = messages[messages.length - 1];
+		if (lastMessage && lastMessage.from === 'assistant' && isTTSEnabled) {
+			processMessageForTTS(lastMessage.content);
+		}
+	}
+
 	async function processMessageForTTS(message: string) {
 		log("Processing message for TTS", { message });
 		const sentences = splitIntoSentences(message);
@@ -152,7 +159,6 @@
 		}
 		log("Handling submit", { message });
 		dispatch("message", message);
-		await processMessageForTTS(message);
 		message = "";
 		log("Submit handled, message cleared");
 	};
