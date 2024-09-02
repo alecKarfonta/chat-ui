@@ -94,15 +94,22 @@
 		for (const sentence of sentences) {
 		try {
 			log("Requesting TTS for sentence", { sentence });
-			const ttsResponse = await requestTTS(sentence, "default_voice");
-			log("TTS response received", { samplerate: ttsResponse.samplerate, wavLength: ttsResponse.wav.length });
+			const ttsResponse = await requestTTS(sentence, "Major");
+			log("TTS response received", { samplerate: ttsResponse.samplerate, wav: ttsResponse.wav });
 
-			const audioBuffer = await audioContext.decodeAudioData(new Float32Array(ttsResponse.wav).buffer);
-			log("Audio decoded", { duration: audioBuffer.duration });
+			
+            // Convert the integer array to a Float32Array
+            const float32Array = new Float32Array(ttsResponse.wav.map(value => value / 32767));
 
-			audioQueue.push(audioBuffer);
-			audioQueue = audioQueue; // Trigger Svelte reactivity
-			log("Audio added to queue", { queueLength: audioQueue.length });
+            // Create an AudioBuffer
+            const audioBuffer = audioContext.createBuffer(1, float32Array.length, ttsResponse.samplerate);
+            audioBuffer.getChannelData(0).set(float32Array);
+
+            log("Audio converted", { duration: audioBuffer.duration });
+
+            audioQueue.push(audioBuffer);
+            audioQueue = audioQueue; // Trigger Svelte reactivity
+            log("Audio added to queue", { queueLength: audioQueue.length });
 
 			if (!isPlaying) {
 			log("Starting playback");
