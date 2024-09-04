@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { openAICompletionToTextGenerationStream } from "./openAICompletionToTextGenerationStream";
 import { openAIChatToTextGenerationStream } from "./openAIChatToTextGenerationStream";
-import type { CompletionCreateParamsStreaming } from "openai/resources/completions";
-import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
+import type { CompletionCreateParamsStreaming, CompletionCreateParamsNonStreaming} from "openai/resources/completions";
+import type { ChatCompletionCreateParamsStreaming, ChatCompletionCreateParamsNonStreaming } from "openai/resources/chat/completions";
 import { buildPrompt } from "$lib/buildPrompt";
 import { env } from "$env/dynamic/private";
 import type { Endpoint } from "../endpoints";
@@ -10,6 +10,7 @@ import type OpenAI from "openai";
 import { createImageProcessorOptionsValidator, makeImageProcessor } from "../images";
 import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "../endpoints";
+import type { TextGenerationStreamOutput } from "@huggingface/inference";
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -41,100 +42,124 @@ export const endpointOAIParametersSchema = z.object({
 			}),
 		})
 		.default({}),
+	stream: z.boolean().default(false),
 });
 
+
 export async function endpointOai(
-	input: z.input<typeof endpointOAIParametersSchema>
+    input: z.input<typeof endpointOAIParametersSchema>
 ): Promise<Endpoint> {
-	const {
-		baseURL,
-		apiKey,
-		completion,
-		model,
-		defaultHeaders,
-		defaultQuery,
-		multimodal,
-		extraBody,
-	} = endpointOAIParametersSchema.parse(input);
+    console.log('endpointOai(): Starting endpointOai function');
+    console.log('endpointOai(): Input:', JSON.stringify(input, null, 2));
 
-	/* eslint-disable-next-line no-shadow */
-	let OpenAI;
-	try {
-		OpenAI = (await import("openai")).OpenAI;
-	} catch (e) {
-		throw new Error("Failed to import OpenAI", { cause: e });
-	}
+    try {
+        const {
+            baseURL,
+            apiKey,
+            completion,
+            model,
+            defaultHeaders,
+            defaultQuery,
+            multimodal,
+            extraBody,
+            stream,
+        } = endpointOAIParametersSchema.parse(input);
+        console.log('Input parsed successfully');
 
-	const openai = new OpenAI({
-		apiKey: apiKey ?? "sk-",
-		baseURL,
-		defaultHeaders,
-		defaultQuery,
-	});
+        let OpenAI;
+        try {
+            console.log('Attempting to import OpenAI');
+            OpenAI = (await import("openai")).OpenAI;
+            console.log('OpenAI imported successfully');
+        } catch (e) {
+            console.error('Failed to import OpenAI:', e);
+            throw new Error("Failed to import OpenAI", { cause: e });
+        }
 
-	const imageProcessor = makeImageProcessor(multimodal.image);
+        console.log('endpointOai(): Initializing OpenAI client');
+        const openai = new OpenAI({
+            apiKey: apiKey ?? "sk-",
+            baseURL,
+            defaultHeaders,
+            defaultQuery,
+        });
+        console.log('endpointOai(): OpenAI client initialized');
 
-	if (completion === "completions") {
-		return async ({ messages, preprompt, continueMessage, generateSettings }) => {
-			const prompt = await buildPrompt({
-				messages,
-				continueMessage,
-				preprompt,
-				model,
-			});
+        console.log('endpointOai(): Initializing image processor');
+        const imageProcessor = makeImageProcessor(multimodal.image);
+        console.log('endpointOai(): Image processor initialized');
 
-			const parameters = { ...model.parameters, ...generateSettings };
-			const body: CompletionCreateParamsStreaming = {
-				model: model.id ?? model.name,
-				prompt,
-				stream: true,
-				max_tokens: parameters?.max_new_tokens,
-				stop: parameters?.stop,
-				temperature: parameters?.temperature,
-				top_p: parameters?.top_p,
-				frequency_penalty: parameters?.repetition_penalty,
-			};
+        if (completion === "completions") {
+            console.log('endpointOai(): Error: completions endpoint is not supported');
+        } else if (completion === "chat_completions") {
+            console.log('endpointOai(): Using chat completions endpoint');
+            return async ({ messages, preprompt, generateSettings }) => {
+                console.log('endpointOai(): Preparing messages');
+                let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
+                    await prepareMessages(messages, imageProcessor);
+                console.log('endpointOai(): Messages prepared:', messagesOpenAI);
 
-			const openAICompletion = await openai.completions.create(body, {
-				body: { ...body, ...extraBody },
-			});
+                if (messagesOpenAI?.[0]?.role !== "system") {
+                    console.log('Adding system message');
+                    messagesOpenAI = [{ role: "system", content: "" }, ...messagesOpenAI];
+                }
 
-			return openAICompletionToTextGenerationStream(openAICompletion);
-		};
-	} else if (completion === "chat_completions") {
-		return async ({ messages, preprompt, generateSettings }) => {
-			let messagesOpenAI: OpenAI.Chat.Completions.ChatCompletionMessageParam[] =
-				await prepareMessages(messages, imageProcessor);
+                if (messagesOpenAI?.[0]) {
+                    console.log('Setting preprompt');
+                    messagesOpenAI[0].content = preprompt ?? "";
+                }
 
-			if (messagesOpenAI?.[0]?.role !== "system") {
-				messagesOpenAI = [{ role: "system", content: "" }, ...messagesOpenAI];
-			}
+                const parameters = { ...model.parameters, ...generateSettings };
+                console.log('endpointOai(): Parameters:', parameters);
 
-			if (messagesOpenAI?.[0]) {
-				messagesOpenAI[0].content = preprompt ?? "";
-			}
+                const body: CompletionCreateParamsStreaming | CompletionCreateParamsNonStreaming = {
+                    model: model.id ?? model.name,
+                    messages: messagesOpenAI,
+                    stream: false,
+                    max_tokens: parameters?.max_new_tokens,
+                    stop: parameters?.stop,
+                    temperature: parameters?.temperature,
+                    top_p: parameters?.top_p,
+                    frequency_penalty: parameters?.repetition_penalty,
+                };
+                console.log('Request body:', body);
 
-			const parameters = { ...model.parameters, ...generateSettings };
-			const body: ChatCompletionCreateParamsStreaming = {
-				model: model.id ?? model.name,
-				messages: messagesOpenAI,
-				stream: true,
-				max_tokens: parameters?.max_new_tokens,
-				stop: parameters?.stop,
-				temperature: parameters?.temperature,
-				top_p: parameters?.top_p,
-				frequency_penalty: parameters?.repetition_penalty,
-			};
-
-			const openChatAICompletion = await openai.chat.completions.create(body, {
-				body: { ...body, ...extraBody },
-			});
-
-			return openAIChatToTextGenerationStream(openChatAICompletion);
-		};
-	} else {
-		throw new Error("Invalid completion type");
-	}
+                try {
+                    console.log('endpointOai(): Sending request to OpenAI chat completions API');
+                    if (stream) {
+                        const openChatAICompletion = await openai.chat.completions.create(body as ChatCompletionCreateParamsStreaming);
+                        console.log('endpointOai(): Received streaming response from OpenAI');
+                        return openAIChatToTextGenerationStream(openChatAICompletion);
+                    } else {
+                        const openChatAICompletion = await openai.chat.completions.create(body as ChatCompletionCreateParamsNonStreaming);
+                        console.log('endpointOai(): Received non-streaming response from OpenAI');
+                        console.log('endpointOai(): openChatAICompletion:', openChatAICompletion);
+                        return async function* (): AsyncGenerator<TextGenerationStreamOutput> {
+                            yield {
+                                token: {
+                                    id: 0,
+                                    text: openChatAICompletion.choices[0]?.message.content ?? "",
+                                    logprob: 0,
+                                    special: false,
+                                },
+                                generated_text: openChatAICompletion.choices[0]?.message.content ?? "",
+                                details: null,
+                            };
+                        }();
+                    }
+                } catch (error) {
+                    console.error('endpointOai(): Error in OpenAI chat completions API call:', error);
+                    throw error;
+                }
+            };
+        } else {
+            console.error('endpointOai(): Invalid completion type:', completion);
+            throw new Error("Invalid completion type");
+        }
+    } catch (error) {
+        console.error('endpointOai(): Error in endpointOai function:', error);
+        throw error;
+    }
 }
 
 async function prepareMessages(

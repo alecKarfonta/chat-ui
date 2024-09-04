@@ -14,7 +14,7 @@ export async function* generateTitleForConversation(
 		if (conv.title !== "New Chat" || !userMessage) return;
 
 		const prompt = userMessage.content;
-		const title = (await generateTitle(prompt)) ?? "New Chat";
+		const title =  "New Chat";
 
 		yield {
 			type: MessageUpdateType.Title,
