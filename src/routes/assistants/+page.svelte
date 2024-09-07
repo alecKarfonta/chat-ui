@@ -107,7 +107,7 @@
 <div class="scrollbar-custom mr-1 h-full overflow-y-auto py-12 max-sm:pt-8 md:py-24">
 	<div class="pt-42 mx-auto flex flex-col px-5 xl:w-[60rem] 2xl:w-[64rem]">
 		<div class="flex items-center">
-			<h1 class="text-2xl font-bold">Assistants</h1>
+			<h1 class="text-2xl font-bold">Characters</h1>
 			{#if isHuggingChat}
 				<div class="5 ml-1.5 rounded-lg text-xxs uppercase text-gray-500 dark:text-gray-500">
 					beta
@@ -121,7 +121,7 @@
 				</a>
 			{/if}
 		</div>
-		<h3 class="text-gray-500">Popular assistants made by the community</h3>
+		<h3 class="text-gray-500">Popular characters made by the community</h3>
 		<div class="mt-6 flex justify-between gap-2 max-sm:flex-col sm:items-center">
 			<select
 				class="mt-1 h-[34px] rounded-lg border border-gray-300 bg-gray-50 px-2 text-sm text-gray-900 focus:border-blue-700 focus:ring-blue-700 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
@@ -138,7 +138,7 @@
 				href={`${base}/settings/assistants/new`}
 				class="flex items-center gap-1 whitespace-nowrap rounded-lg border bg-white py-1 pl-1.5 pr-2.5 shadow-sm hover:bg-gray-50 hover:shadow-none dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700"
 			>
-				<CarbonAdd />Create new assistant
+				<CarbonAdd />Create new character
 			</a>
 		</div>
 
@@ -147,7 +147,7 @@
 				<div
 					class="flex items-center gap-1.5 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 				>
-					{assistantsCreator}'s Assistants
+					{assistantsCreator}'s Characters
 					<a
 						href={getHref($page.url, {
 							existingKeys: { behaviour: "delete", keys: ["user", "modelId", "p", "q"] },
@@ -300,7 +300,7 @@
 					{/if}
 				</button>
 			{:else}
-				No assistants found
+				No Characters found
 			{/each}
 		</div>
 		<Pagination

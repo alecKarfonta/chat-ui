@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from "svelte";
   	import { requestTTS, splitIntoSentences } from "$lib/utils/tts";
+
+	import { requestSTT } from "$lib/utils/stt";
   
 	import type { Message, MessageFile } from "$lib/types/Message";
 	import { createEventDispatcher, onDestroy, tick } from "svelte";
@@ -62,7 +64,15 @@
 	let audioQueue: AudioBuffer[] = [];
 	let audioContext: AudioContext;
 	let isPlaying = false;
-	let isTTSEnabled = true; // New variable to toggle TTS
+	let isTTSEnabled = true; // New variable to toggle TTS\
+
+	// STT variables
+    let mediaRecorder: MediaRecorder | null = null;
+    let audioChunks: Blob[] = [];
+    let audioUrl: string | null = null;
+    let audioElement: HTMLAudioElement;
+
+    let isRecording = false;
 
 
 	function log(message: string, data?: any) {
@@ -74,8 +84,39 @@
 
 	onMount(() => {
 		log("Component mounted");
+		// Init TTS playback
 		audioContext = new (window.AudioContext || window.webkitAudioContext)();
 		log("AudioContext created", { state: audioContext.state });
+
+		// Init STT recording
+		navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+
+					// Playback the recorded audio
+
+					// Create a URL for the audio blob
+					if (audioUrl) {
+						URL.revokeObjectURL(audioUrl);
+					}
+					audioUrl = URL.createObjectURL(audioBlob);
+
+
+
+                    const response = await requestSTT(audioBlob);
+                    message = response.text;
+
+					log("STT response received", { text: message });
+                    audioChunks = [];
+                };
+            })
+            .catch(error => console.error("Error accessing microphone:", error));
 	});
 
 	onDestroy(() => {
@@ -86,12 +127,55 @@
 		}
 	});
 
+
+	function startRecording() {
+        if (mediaRecorder && mediaRecorder.state === "inactive") {
+            mediaRecorder.start();
+            isRecording = true;
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            isRecording = false;
+        }
+    }
+
 	$: {
 		const lastMessage = messages[messages.length - 1];
 		if (lastMessage && lastMessage.from === 'assistant' && isTTSEnabled) {
 			processMessageForTTS(lastMessage.content);
 		}
 	}
+
+	async function handleAudioData(event: BlobEvent) {
+        audioChunks.push(event.data);
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        console.log("Audio blob size:", audioBlob.size);
+        console.log("Audio blob type:", audioBlob.type);
+
+        // Create a URL for the audio blob
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+        }
+        audioUrl = URL.createObjectURL(audioBlob);
+
+        try {
+            const response = await requestSTT(audioBlob);
+            message = response.text;
+        } catch (error) {
+            console.error("Error processing audio:", error);
+        }
+    }
+
+    function playAudio() {
+		console.log("playAudio: audioUrl:", audioUrl, "audioElement:", audioElement);
+        if (audioElement && audioUrl) {
+            audioElement.src = audioUrl;
+            audioElement.play();
+        }
+    }
 
 	async function processMessageForTTS(message: string) {
 		log("Processing message for TTS", { message });
@@ -100,9 +184,13 @@
 
 		for (const sentence of sentences) {
 		try {
-			log("Requesting TTS for sentence", { sentence });
+			// If sentence is empty, skip
+			if (sentence.trim() === "") {
+				continue;
+			}
+			//log("Requesting TTS for sentence", { sentence });
 			const ttsResponse = await requestTTS(sentence, "Major");
-			log("TTS response received", { samplerate: ttsResponse.samplerate, wav: ttsResponse.wav });
+			//log("TTS response received", { samplerate: ttsResponse.samplerate, wav: ttsResponse.wav });
 
 			
             // Convert the integer array to a Float32Array
@@ -112,7 +200,7 @@
             const audioBuffer = audioContext.createBuffer(1, float32Array.length, ttsResponse.samplerate);
             audioBuffer.getChannelData(0).set(float32Array);
 
-            log("Audio converted", { duration: audioBuffer.duration });
+            //log("Audio converted", { duration: audioBuffer.duration });
 
             audioQueue.push(audioBuffer);
             audioQueue = audioQueue; // Trigger Svelte reactivity
@@ -545,6 +633,26 @@
 			<div
 				class="mt-2 flex justify-between self-stretch px-1 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2"
 			>
+
+				<button
+					class="btn rounded-lg px-3 py-1.5 text-sm {isRecording ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}"
+					on:mousedown={startRecording}
+					on:mouseup={stopRecording}
+					on:mouseleave={stopRecording}
+				>
+					{isRecording ? 'Recording...' : 'Hold to Speak'}
+				</button>
+
+				{#if audioUrl}
+					<button
+						on:click={playAudio}
+						class="btn rounded-lg px-3 py-1.5 text-sm bg-green-500 text-white hover:bg-green-600"
+					>
+						Play Recorded Audio
+					</button>
+				{/if}
+				<audio bind:this={audioElement} />
+
 				
 				<button on:click={() => {
 					audioQueue = [];
@@ -554,8 +662,11 @@
 					} else {
 						audioContext.resume();
 					}
-					}}>Stop TTS</button>
+					}}>Stop Talking</button>
+
+					
 			</div>
+			
 		</div>
 	</div>
 </div>

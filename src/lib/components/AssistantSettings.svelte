@@ -163,12 +163,12 @@
 			Edit Assistant: {assistant?.name ?? "assistant"}
 		</h2>
 		<p class="mb-6 text-sm text-gray-500">
-			Modifying an existing assistant will propagate the changes to all users.
+			Modifying an existing character will propagate the changes to all users.
 		</p>
 	{:else}
-		<h2 class="text-xl font-semibold">Create new assistant</h2>
+		<h2 class="text-xl font-semibold">Create new character</h2>
 		<p class="mb-6 text-sm text-gray-500">
-			Create and share your own AI Assistant. All assistants are <span
+			Create and share your own Characrter. All characters are <span
 				class="rounded-full border px-2 py-0.5 leading-none">public</span
 			>
 		</p>
@@ -240,7 +240,7 @@
 				<input
 					name="name"
 					class="w-full rounded-lg border-2 border-gray-200 bg-gray-100 p-2"
-					placeholder="Assistant Name"
+					placeholder="Character Name"
 					value={assistant?.name ?? ""}
 				/>
 				<p class="text-xs text-red-500">{getError("name", form)}</p>
@@ -305,7 +305,7 @@
 								step="0.1"
 								class="w-20 rounded-lg border-2 border-gray-200 bg-gray-100 px-2 py-1"
 								placeholder={selectedModel?.parameters?.temperature?.toString() ?? "1"}
-								value={assistant?.generateSettings?.temperature ?? ""}
+								value={assistant?.generateSettings?.temperature ?? "1"}
 							/>
 						</label>
 						<label for="top_p" class="flex justify-between">
@@ -328,7 +328,7 @@
 								max="1"
 								step="0.05"
 								placeholder={selectedModel?.parameters?.top_p?.toString() ?? "1"}
-								value={assistant?.generateSettings?.top_p ?? ""}
+								value={assistant?.generateSettings?.top_p ?? "1"}
 							/>
 						</label>
 						<label for="repetition_penalty" class="flex justify-between">
@@ -350,7 +350,7 @@
 								step="0.1"
 								class="w-20 rounded-lg border-2 border-gray-200 bg-gray-100 px-2 py-1"
 								placeholder={selectedModel?.parameters?.repetition_penalty?.toString() ?? "1.0"}
-								value={assistant?.generateSettings?.repetition_penalty ?? ""}
+								value={assistant?.generateSettings?.repetition_penalty ?? "1.0"}
 							/>
 						</label>
 						<label for="top_k" class="flex justify-between">
@@ -370,8 +370,8 @@
 								max="100"
 								step="5"
 								class="w-20 rounded-lg border-2 border-gray-200 bg-gray-100 px-2 py-1"
-								placeholder={selectedModel?.parameters?.top_k?.toString() ?? "50"}
-								value={assistant?.generateSettings?.top_k ?? ""}
+								placeholder={selectedModel?.parameters?.top_k?.toString() ?? "40"}
+								value={assistant?.generateSettings?.top_k ?? "40"}
 							/>
 						</label>
 					</div>

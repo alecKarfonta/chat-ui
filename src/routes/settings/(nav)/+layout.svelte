@@ -76,10 +76,10 @@
 		<!-- if its huggingchat, the number of assistants owned by the user must be non-zero to show the UI -->
 		{#if data.enableAssistants}
 			<h3 bind:this={assistantsSection} class="pl-3 pt-5 text-[.8rem] text-gray-800 sm:pl-1">
-				Assistants
+				Characters
 			</h3>
 			<!-- My Assistants -->
-			<h4 class="py-2 pl-5 text-[.7rem] text-gray-600 sm:pl-1">My Assistants</h4>
+			<h4 class="py-2 pl-5 text-[.7rem] text-gray-600 sm:pl-1">My Characters</h4>
 
 			{#each data.assistants.filter((assistant) => assistant.createdByMe) as assistant}
 				<a
