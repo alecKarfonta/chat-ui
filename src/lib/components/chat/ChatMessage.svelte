@@ -225,6 +225,7 @@
 		}
 	}
 	$: if (message.children?.length === 0) $convTreeStore.leaf = message.id;
+	$: isMessageComplete = message.content && !loading;
 </script>
 
 {#if message.from === "assistant"}
@@ -234,86 +235,88 @@
 		on:click={() => (isTapped = !isTapped)}
 		on:keydown={() => (isTapped = !isTapped)}
 	>
-		{#if $page.data?.assistant?.avatar}
-			<img
-				src="{base}/settings/assistants/{$page.data.assistant._id}/avatar.jpg"
-				alt="Avatar"
-				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
-			/>
-		{:else}
-			<img
-				alt=""
-				src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
-				class="mt-5 h-3 w-3 flex-none select-none rounded-full shadow-lg"
-			/>
-		{/if}
-		<div
-			class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
-		>
-			{#if message.files?.length}
-				<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
-					{#each message.files as file}
-						<UploadedFile {file} canClose={false} isPreview={false} />
+		{#if message.content}
+            {#if $page.data?.assistant?.avatar}
+                <img
+                    src="{base}/settings/assistants/{$page.data.assistant._id}/avatar.jpg"
+                    alt="Avatar"
+                    class="mt-5 h-16 w-16 flex-none select-none rounded-full shadow-lg"
+                />
+            {:else}
+                <img
+                    alt=""
+                    src="https://huggingface.co/avatars/2edb18bd0206c16b433841a47f53fa8e.svg"
+                    class="mt-5 h-16 w-16 flex-none select-none rounded-full shadow-lg"
+                />
+            {/if}
+			<div
+				class="relative min-h-[calc(2rem+theme(spacing[3.5])*2)] min-w-[60px] break-words rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 px-5 py-3.5 text-gray-600 prose-pre:my-2 dark:border-gray-800 dark:from-gray-800/40 dark:text-gray-300"
+			>
+				{#if message.files?.length}
+					<div class="flex h-fit flex-wrap gap-x-5 gap-y-2">
+						{#each message.files as file}
+							<UploadedFile {file} canClose={false} isPreview={false} />
+						{/each}
+					</div>
+				{/if}
+				{#if searchUpdates && searchUpdates.length > 0}
+					<OpenWebSearchResults
+						classNames={tokens.length ? "mb-3.5" : ""}
+						webSearchMessages={searchUpdates}
+					/>
+				{/if}
+
+				{#if toolUpdates}
+					{#each Object.values(toolUpdates) as tool}
+						{#if tool.length}
+							{#key tool[0].uuid}
+								<ToolUpdate {tool} {loading} />
+							{/key}
+						{/if}
+					{/each}
+				{/if}
+
+				<div
+					class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
+					bind:this={contentEl}
+				>
+					{#each tokens as token}
+						{#if token.type === "code"}
+							<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
+						{:else}
+							{#await marked.parse(token.raw, options) then parsed}
+								<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+								{@html DOMPurify.sanitize(parsed)}
+							{/await}
+						{/if}
 					{/each}
 				</div>
-			{/if}
-			{#if searchUpdates && searchUpdates.length > 0}
-				<OpenWebSearchResults
-					classNames={tokens.length ? "mb-3.5" : ""}
-					webSearchMessages={searchUpdates}
-				/>
-			{/if}
 
-			{#if toolUpdates}
-				{#each Object.values(toolUpdates) as tool}
-					{#if tool.length}
-						{#key tool[0].uuid}
-							<ToolUpdate {tool} {loading} />
-						{/key}
-					{/if}
-				{/each}
-			{/if}
-
-			<div
-				class="prose max-w-none dark:prose-invert max-sm:prose-sm prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-base prose-pre:bg-gray-800 dark:prose-pre:bg-gray-900"
-				bind:this={contentEl}
-			>
-				{#if isLast && loading && $settings.disableStream}
-					<IconLoading classNames="loading inline ml-2 first:ml-0" />
+				<!-- Web Search sources -->
+				{#if webSearchSources?.length}
+					<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
+						<div class="text-gray-400">Sources:</div>
+						{#each webSearchSources as { link, title }}
+							<a
+								class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
+								href={link}
+								target="_blank"
+							>
+								<img
+									class="h-3.5 w-3.5 rounded"
+									src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(link).hostname}"
+									alt="{title} favicon"
+								/>
+								<div>{new URL(link).hostname.replace(/^www\./, "")}</div>
+							</a>
+						{/each}
+					</div>
 				{/if}
-				{#each tokens as token}
-					{#if token.type === "code"}
-						<CodeBlock lang={token.lang} code={unsanitizeMd(token.text)} />
-					{:else}
-						{#await marked.parse(token.raw, options) then parsed}
-							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-							{@html DOMPurify.sanitize(parsed)}
-						{/await}
-					{/if}
-				{/each}
 			</div>
 
-			<!-- Web Search sources -->
-			{#if webSearchSources?.length}
-				<div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
-					<div class="text-gray-400">Sources:</div>
-					{#each webSearchSources as { link, title }}
-						<a
-							class="flex items-center gap-2 whitespace-nowrap rounded-lg border bg-white px-2 py-1.5 leading-none hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
-							href={link}
-							target="_blank"
-						>
-							<img
-								class="h-3.5 w-3.5 rounded"
-								src="https://www.google.com/s2/favicons?sz=64&domain_url={new URL(link).hostname}"
-								alt="{title} favicon"
-							/>
-							<div>{new URL(link).hostname.replace(/^www\./, "")}</div>
-						</a>
-					{/each}
-				</div>
-			{/if}
-		</div>
+        {:else}
+            <div class="mt-5 h-3 w-3 flex-none"></div>
+        {/if}
 		{#if !loading && (message.content || toolUpdates)}
 			<div
 				class="absolute -bottom-4 right-0 flex max-md:transition-all md:group-hover:visible md:group-hover:opacity-100

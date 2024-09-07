@@ -1,4 +1,5 @@
 import { base } from "$app/paths";
+import { env } from "$env/dynamic/public";
 
 interface TTSRequest {
   text: string;
@@ -11,7 +12,8 @@ interface TTSResponse {
 }
 
 export async function requestTTS(text: string, voice_name: string): Promise<TTSResponse> {
-  const response = await fetch(`${base}/api/tts`, {
+  console.log('lib/utils/tts.ts: text = ', text);
+  const response = await fetch(`${env.PUBLIC_ORIGIN}/api/tts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
