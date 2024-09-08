@@ -47,6 +47,9 @@ export const endpointOAIParametersSchema = z.object({
 		})
 		.default({}),
 	stream: z.boolean().default(false),
+    assistant_name: z.string().optional(),
+    assistant_description: z.string().optional(),
+    assistant_preprompt: z.string().optional(),
     assistant: z.object({
         rag: z.boolean().optional(),
         dynamicPrompt: z.boolean().optional(),
@@ -55,7 +58,16 @@ export const endpointOAIParametersSchema = z.object({
         name: z.string().optional(),
         description: z.string().optional(),
         preprompt: z.string().optional(),
-      }).optional(),
+        character: z.string().optional(), // Added this field
+        _id: z.string().optional(),
+        createdById: z.string().optional(),
+        modelId: z.string().optional(),
+        createdAt: z.date().optional(),
+        updatedAt: z.date().optional(),
+        exampleInputs: z.array(z.any()).optional(),
+        searchTokens: z.array(z.string()).optional(),
+        last24HoursCount: z.number().optional(),
+    }).optional(),
 });
 
 
@@ -65,7 +77,7 @@ export async function endpointOai(
     input: z.input<typeof endpointOAIParametersSchema>
 ): Promise<Endpoint> {
     const startTime = performance.now();
-    console.log('endpointOai(): Starting endpointOai function');
+    console.log('endpointOai(): Starting endpointOai function with input:', input);
     
     try {
         const parseStartTime = performance.now();
@@ -144,7 +156,7 @@ export async function endpointOai(
                 };
 
                 const body = {
-                    character: assistant?.character,
+                    character: assistant?.name,
                     model: model.id ?? model.name,
                     messages: messagesOpenAI,
                     stream: false,
@@ -153,6 +165,9 @@ export async function endpointOai(
                     temperature: parameters?.temperature,
                     top_p: parameters?.top_p,
                     frequency_penalty: parameters?.repetition_penalty,
+                    assistant_name,
+                    assistant_description,
+                    assistant_preprompt,
                 };
 
                 try {

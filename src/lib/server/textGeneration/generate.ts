@@ -17,6 +17,8 @@ export async function* generate(
     const startTime = performance.now();
     console.log('generate(): Starting generate function');
     console.log('generate(): assistant = ', assistant);
+    console.log('generate(): endpoint = ', endpoint);
+    console.log('generate(): preprompt = ', preprompt);
 
     let tokenCount = 0;
     let lastYieldTime = startTime;
@@ -25,27 +27,15 @@ export async function* generate(
         const endpointStartTime = performance.now();
         const endpointResponse = await endpoint({
             messages,
-            preprompt,
+            preprompt: preprompt,
             continueMessage: isContinue,
             generateSettings: assistant?.generateSettings,
+            toolResults,
             assistant_name: assistant?.name,
             assistant_description: assistant?.description,
             assistant_preprompt: assistant?.preprompt,
-            assistant: assistant ? { 
-                ...assistant, 
-                _id: '', 
-                createdById: '', 
-                name: '', 
-                modelId: '', 
-                createdAt: new Date(), 
-                updatedAt: new Date(),
-                exampleInputs: [],
-                preprompt: '',
-                searchTokens: [],
-                last24HoursCount: 0
-            } : undefined,
-            toolResults,
         });
+
         //console.log(`Endpoint initialization took ${performance.now() - endpointStartTime}ms`);
         if (Symbol.asyncIterator in endpointResponse) {
             for await (const output of endpointResponse) {
@@ -98,7 +88,7 @@ export async function* generate(
                 }
             }
         } else {
-            console.log('endpointResponse is not an async iterator');
+            //console.log('endpointResponse is not an async iterator');
             // Non-streaming response
             const output = endpointResponse as TextGenerationOutput;
             console.log('generate(): non-streaming output = ', output);
