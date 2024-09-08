@@ -107,10 +107,9 @@
 					}
 					audioUrl = URL.createObjectURL(audioBlob);
 
-
-
                     const response = await requestSTT(audioBlob);
                     message = response.text;
+					handleSubmit();
 
 					log("STT response received", { text: message });
                     audioChunks = [];
