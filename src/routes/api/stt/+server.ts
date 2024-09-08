@@ -5,7 +5,7 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
         const body = await request.json();
         const audioData = body.wav;
-        console.log('routes/api/stt/ +server.ts: Received STT request:');
+        //console.log('routes/api/stt/ +server.ts: Received STT request:');
 
         if (!Array.isArray(audioData) || audioData.length === 0) {
             console.log('routes/api/stt/ +server.ts: Invalid audio data provided:', audioData);
@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request }) => {
             wav: audioData
         };
 
-        console.log('routes/api/stt/ +server.ts: Sending STT request:', payload);
+        //console.log('routes/api/stt/ +server.ts: Sending STT request:', payload);
 
         const response = await fetch('http://192.168.1.196:8401/transcribe', {
             method: 'POST',

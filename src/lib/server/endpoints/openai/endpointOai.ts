@@ -12,6 +12,9 @@ import { createImageProcessorOptionsValidator, makeImageProcessor } from "../ima
 import type { MessageFile } from "$lib/types/Message";
 import type { EndpointMessage } from "../endpoints";
 import type { TextGenerationStreamOutput } from "@huggingface/inference";
+import type { TextGenerationOutput } from "@huggingface/inference";
+
+
 
 export const endpointOAIParametersSchema = z.object({
 	weight: z.number().int().positive().default(1),
@@ -44,6 +47,15 @@ export const endpointOAIParametersSchema = z.object({
 		})
 		.default({}),
 	stream: z.boolean().default(false),
+    assistant: z.object({
+        rag: z.boolean().optional(),
+        dynamicPrompt: z.boolean().optional(),
+        generateSettings: z.record(z.any()).optional(),
+        tools: z.array(z.string()).optional(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        preprompt: z.string().optional(),
+      }).optional(),
 });
 
 
@@ -67,7 +79,25 @@ export async function endpointOai(
             multimodal,
             extraBody,
             stream,
+            assistant,
+            assistant_name,
+            assistant_description,
+            assistant_preprompt,
         } = endpointOAIParametersSchema.parse(input);
+
+        console.log('Making request to OpenAI');
+        console.log('baseURL:', baseURL);
+        console.log('completion:', completion);
+        console.log('model:', model);
+        console.log('defaultHeaders:', defaultHeaders);
+        console.log('defaultQuery:', defaultQuery);
+        console.log('multimodal:', multimodal);
+        console.log('extraBody:', extraBody);
+        console.log('stream:', stream);
+        console.log('assistant:', assistant);
+        console.log('assistant_name:', assistant_name);
+        console.log('assistant_description:', assistant_description);
+        console.log('assistant_preprompt:', assistant_preprompt);
         console.log(`Input parsing took ${performance.now() - parseStartTime}ms`);
 
         const importStartTime = performance.now();
@@ -96,7 +126,7 @@ export async function endpointOai(
         if (completion === "chat_completions") {
             return async ({ messages, preprompt, generateSettings }) => {
                 const prepareMessagesStartTime = performance.now();
-                let messagesOpenAI = await prepareMessages(messages, imageProcessor);
+                let messagesOpenAI = await prepareMessages(messages, imageProcessor, assistant);
                 console.log(`Preparing messages took ${performance.now() - prepareMessagesStartTime}ms`);
 
                 if (messagesOpenAI?.[0]?.role !== "system") {
@@ -107,9 +137,14 @@ export async function endpointOai(
                     messagesOpenAI[0].content = preprompt ?? "";
                 }
 
-                const parameters = { ...model.parameters, ...generateSettings };
+                const parameters = { 
+                    ...model.parameters, 
+                    ...generateSettings,
+                    ...assistant?.generateSettings // Merge assistant settings
+                };
 
                 const body = {
+                    character: assistant?.character,
                     model: model.id ?? model.name,
                     messages: messagesOpenAI,
                     stream: false,
@@ -129,20 +164,30 @@ export async function endpointOai(
                     } else {
                         const openChatAICompletion = await openai.chat.completions.create(body as ChatCompletionCreateParamsNonStreaming);
                         console.log(`Non-streaming API call took ${performance.now() - apiCallStartTime}ms`);
-                        return async function* (): AsyncGenerator<TextGenerationStreamOutput> {
-                            const yieldStartTime = performance.now();
-                            yield {
-                                token: {
-                                    id: 0,
-                                    text: openChatAICompletion.choices[0]?.message.content ?? "",
-                                    logprob: 0,
-                                    special: false,
-                                },
-                                generated_text: openChatAICompletion.choices[0]?.message.content ?? "",
-                                details: null,
-                            };
-                            console.log(`Yielding response took ${performance.now() - yieldStartTime}ms`);
-                        }();
+                        
+
+                        // Prepare and return the response object directly
+                        const responseObject: TextGenerationOutput = {
+                            generated_text: openChatAICompletion.choices[0]?.message.content ?? "",
+                            details: null
+                        };
+
+                        console.log(`Response object created at ${performance.now()}ms`);
+                        return responseObject;
+                        //return async function* (): AsyncGenerator<TextGenerationStreamOutput> {
+                        //    const yieldStartTime = performance.now();
+                        //   yield {
+                        //        token: {
+                        //            id: 0,
+                        //            text: openChatAICompletion.choices[0]?.message.content ?? "",
+                        //            logprob: 0,
+                        //            special: false,
+                        //        },
+                        //        generated_text: openChatAICompletion.choices[0]?.message.content ?? "",
+                        //        details: null,
+                        //    };
+                        //    console.log(`Yielding response took ${performance.now() - yieldStartTime}ms`);
+                        //}();
                     }
                 } catch (error) {
                     console.error('Error in OpenAI chat completions API call:', error);
@@ -163,11 +208,15 @@ export async function endpointOai(
 
 async function prepareMessages(
 	messages: EndpointMessage[],
-	imageProcessor: ReturnType<typeof makeImageProcessor>
+	imageProcessor: ReturnType<typeof makeImageProcessor>,
+    assistant?: z.infer<typeof endpointOAIParametersSchema>['assistant']
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
 	return Promise.all(
 		messages.map(async (message) => {
 			if (message.from === "user") {
+
+                let content = message.content;
+                
 				return {
 					role: message.from,
 					content: [
@@ -176,6 +225,14 @@ async function prepareMessages(
 					],
 				};
 			}
+            if (message.from === "assistant" && assistant?.rag) {
+                // Handle RAG-specific logic here
+                // For example, you might want to add citations or modify the content
+                return {
+                    role: message.from,
+                    content: `[RAG-enhanced] ${message.content}`,
+                };
+            }
 			return {
 				role: message.from,
 				content: message.content,

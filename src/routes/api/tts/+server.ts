@@ -2,7 +2,7 @@ import type { RequestHandler } from "@sveltejs/kit";
 
 export const POST: RequestHandler = async ({ request }) => {
   const { text, voice_name } = await request.json();
-  console.log('routes/api/tts/ +server.ts: Received TTS request:', { text, voice_name });
+  //console.log('routes/api/tts/ +server.ts: Received TTS request:', { text, voice_name });
   // TODO: Implement actual TTS service call here
   // For now, we'll return a mock response
   //const mockResponse = {
@@ -28,8 +28,8 @@ export const POST: RequestHandler = async ({ request }) => {
     voice_name: voice_name,
   };
 
-  console.log('routes/api/tts/ +server.ts: text = ', text);
-  console.log('routes/api/tts/ +server.ts: Sending TTS request:', payload);
+  //console.log('routes/api/tts/ +server.ts: text = ', text);
+  //console.log('routes/api/tts/ +server.ts: Sending TTS request:', payload);
 
   const response = await fetch('http://192.168.1.196:8001/tts', {
     method: 'POST',

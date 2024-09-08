@@ -29,6 +29,7 @@ import endpointLangserve, {
 } from "./langserve/endpointLangserve";
 
 import type { Tool, ToolCall, ToolResult } from "$lib/types/Tool";
+import { Assistant } from "../../types/Assistant";
 
 export type EndpointMessage = Omit<Message, "id">;
 
@@ -38,6 +39,10 @@ export interface EndpointParameters {
 	preprompt?: Conversation["preprompt"];
 	continueMessage?: boolean; // used to signal that the last message will be extended
 	generateSettings?: Partial<Model["parameters"]>;
+	assistant_name?: string;
+	assistant_description?: string;
+	assistant_preprompt?: string;
+	assistant?: Assistant;
 	tools?: Tool[];
 	toolResults?: ToolResult[];
 	isMultimodal?: boolean;
